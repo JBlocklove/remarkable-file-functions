@@ -2,9 +2,12 @@
 
 xochitl_loc="/home/root/.local/share/remarkable/xochitl"
 
+script_dir="$( cd -- "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
 function create_dir_metadata() {
 	#creates metadata for new directory under $1 with name $2 and uuid $3 in directory $4
-	cp dir_metadata.txt $4/$3.metadata
+
+	cp -v $script_dir/dir_metadata.txt $4/$3.metadata
 	sed -i -e "s|PARENT_UUID|\"$1\"|" -e "s|DIR_NAME|\"$2\"|" $4/$3.metadata
 }
 
@@ -16,7 +19,8 @@ function create_dir_content() {
 function create_doc_metadata() {
 	#creates metadata and pagedata files for pdf $1 under parent $2 with visible name $3 in directory $4
 	mod_time=`date +%s`
-	cp -v doc_metadata.txt $4/$1.metadata
+
+	cp -v $script_dir/doc_metadata.txt $4/$1.metadata
 	sed -i -e "s/PARENT_NAME/$2/" -e "s/DOC_NAME/$3/" -e "s/MOD_TIME/$mod_time/" $4/$1.metadata
 }
 
@@ -24,7 +28,8 @@ function create_doc_content() {
 	#creates content files for pdf $1 in directory $2
 	new_uuid page_uuid
 	size_in_bytes=`stat -c %s $2/$1.pdf`
-	cp -v doc_content.txt $2/$1.content
+
+	cp -v $script_dir/doc_content.txt $2/$1.content
 	sed -i -e "s/PAGE_UUID/$page_uuid/" -e "s/SIZE_IN_BYTES/$size_in_bytes/" $2/$1.content
 }
 
@@ -33,24 +38,21 @@ function find_uuid() {
 
 	local  __resultvar=$3
 
-    #IFS=$'\n'
-	#local dir_arr=($(echo "$1" | sed -e 's|/|\n|g' | awk -F '\n' '{ print $1 }'))
-	#local name="${dir_arr[-1]}"
-	local name=`basename $1`
+	local name=$(basename "$1")
 
 	for filename in $xochitl_loc/*.metadata ; do
-		get_name $filename doc_name
+		local doc_name=$(get_name $filename)
 
 		if [[ $doc_name == $name ]]; then
-			get_type $filename doc_type
+			local doc_type=$(get_type $filename)
 			if [[ $doc_type == $2 ]]; then
-				echo `basename $filename .metadata`
-				get_parent_uuid $filename parent_uuid
-				check_path `dirname $1` $parent_uuid path_exists
-				echo $path_exists
-				if [[ $path_exists == true ]]; then
-					uuid=`basename $filename .metadata`
-					break
+				local parent_uuid=$(get_parent_uuid $filename)
+				if [[ $parent_uuid != "trash" ]]; then
+					local path_exists=$(check_path $(dirname "$1") $parent_uuid)
+					if [[ $path_exists == true ]]; then
+						local uuid=$(basename $filename .metadata)
+						break
+					fi
 				fi
 			fi
 		fi
@@ -65,7 +67,7 @@ function find_uuid() {
 
 function get_name() {
 	local __resultvar=$2
-	doc_name=`sed -e 's/    //g' -e 's/\"//g' -e 's/: /:/g' $1 | awk -F '[:,]' '{if ($1 == "visibleName") print $2;}'`
+	local doc_name=`sed -e 's/    //g' -e 's/\"//g' -e 's/: /:/g' $1 | awk -F '[:,]' '{if ($1 == "visibleName") print $2;}'`
     if [[ "$__resultvar" ]]; then
         eval $__resultvar="'$doc_name'"
     else
@@ -75,7 +77,7 @@ function get_name() {
 
 function get_type() {
 	local __resultvar=$2
-	doc_type=`sed -e 's/    //g' -e 's/\"//g' -e 's/: /:/g' $1 | awk -F '[:,]' '{if ($1 == "type") print $2;}'`
+	local doc_type=`sed -e 's/    //g' -e 's/\"//g' -e 's/: /:/g' $1 | awk -F '[:,]' '{if ($1 == "type") print $2;}'`
     if [[ "$__resultvar" ]]; then
         eval $__resultvar="'$doc_type'"
     else
@@ -85,7 +87,7 @@ function get_type() {
 
 function get_parent_uuid() {
 	local __resultvar=$2
-	parent_uuid=`sed -e 's/    //g' -e 's/\"//g' -e 's/: /:/g' $1 | awk -F '[:,]' '{if ($1 == "parent") print $2;}'`
+	local parent_uuid=`sed -e 's/    //g' -e 's/\"//g' -e 's/: /:/g' $1 | awk -F '[:,]' '{if ($1 == "parent") print $2;}'`
 	if [[ "$__resultvar" ]]; then
 		eval $__resultvar="'$parent_uuid'"
 	else
@@ -98,23 +100,30 @@ function check_path() {
 	#checks that path $1 exists recursively starting from a node with parent uuid $2
 
 	local  __resultvar=$3
-	local leaf_name=`basename $1`
+	local leaf_name="$(basename $1)"
 	local parent_uuid=$2
 
 	local root_dir=`echo $1 | awk -F '/' '{print $2}'`
 
-	local filename=$xochitl_loc/$parent_uuid.metadata
-	get_name $filename parent_name
-	get_parent_uuid $filename new_parent_uuid
-
-	if [[ $new_parent_uuid == "" && $leaf_name == $root_dir ]]; then
+	if [[ -z $parent_uuid  && $leaf_name == "/" ]]; then # Special case is passed the root directory
 		local result=true
-	elif [[ $parent_name == $leaf_name ]]; then
-		# recurse
-		check_path `dirname $1` $new_parent_uuid $result
 	else
-		local result=false
+		local filename=$xochitl_loc/$parent_uuid.metadata
+		local parent_name=$(get_name $filename)
+		local new_parent_uuid=$(get_parent_uuid $filename)
+
+		if [[ $new_parent_uuid == "trash" ]]; then
+			local result=false
+		elif [[ $new_parent_uuid == "" && $leaf_name == $root_dir ]]; then
+			local result=true
+		elif [[ $parent_name == $leaf_name ]]; then
+			# recurse
+			local result=$(check_path "$(dirname $1)" $new_parent_uuid)
+		else
+			local result=false
+		fi
 	fi
+
 
 	if [[ "$__resultvar" ]]; then
 		eval $__resultvar="'$result'"
@@ -134,22 +143,38 @@ function new_uuid() {
     fi
 }
 
+#function rm_mkdir() {
+#	local parent_uuid
+#	local dir_uuid
+#    IFS=$'\n'
+#	dir_arr=($(echo "$1" | sed -e 's|/|\n|g' | awk -F '\n' -v q='"' '{ print $1 }'))
+#	for ((i=0; i<${#dir_arr[@]}; i++)) ; do
+#		if [[ $i != 0 ]]; then
+#			parent=${dir_arr[$i-1]}
+#			find_uuid $parent "dir" parent_uuid
+#		fi
+#		find_uuid ${dir_arr[$i]} "dir" dir_uuid
+#		if [[ $dir_uuid == "" ]]; then
+#			new_uuid dir_uuid
+#			create_dir_metadata "$parent_uuid" "${dir_arr[$i]}" $dir_uuid $xochitl_loc
+#			create_dir_content $dir_uuid $xochitl_loc
+#		fi
+#	done
+#}
+
 function rm_mkdir() {
-	local parent_uuid
-	local dir_uuid
-    IFS=$'\n'
-	dir_arr=($(echo "$1" | sed -e 's|/|\n|g' | awk -F '\n' -v q='"' '{ print $1 }'))
-	for ((i=0; i<${#dir_arr[@]}; i++)) ; do
-		if [[ $i != 0 ]]; then
-			parent=${dir_arr[$i-1]}
-			find_uuid $parent "dir" parent_uuid
-		fi
-		find_uuid ${dir_arr[$i]} "dir" dir_uuid
+	local num_fields=$(echo $1 | awk -F '/' '{print NF}')
+	local print_string='{print '
+	for ((i=0; i<$num_fields-1; i++)) ; do
+		local print_val=$((i+2))
+		local print_string=${print_string}\"/\"\$${print_val}
+		local dir=$(echo $1 | awk -F '/' "$print_string}")
+		local dir_uuid=$(find_uuid "$dir" "CollectionType")
 		if [[ $dir_uuid == "" ]]; then
-			new_uuid dir_uuid
-			create_dir_metadata "$parent_uuid" "${dir_arr[$i]}" $dir_uuid $xochitl_loc
+			local dir_uuid=$(new_uuid)
+			create_dir_metadata "$parent_uuid" "$(basename "$dir")" $dir_uuid $xochitl_loc
 			create_dir_content $dir_uuid $xochitl_loc
 		fi
+		local parent_uuid=$dir_uuid
 	done
 }
-
