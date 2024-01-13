@@ -18,19 +18,19 @@ function create_dir_content() {
 
 function create_doc_metadata() {
 	#creates metadata and pagedata files for pdf $1 under parent $2 with visible name $3 in directory $4
-	mod_time=`date +%s`
+	local mod_time=`date +%s`
 
 	cp -v $script_dir/doc_metadata.txt $4/$1.metadata
 	sed -i -e "s/PARENT_NAME/$2/" -e "s/DOC_NAME/$3/" -e "s/MOD_TIME/$mod_time/" $4/$1.metadata
 }
 
 function create_doc_content() {
-	#creates content files for pdf $1 in directory $2
-	new_uuid page_uuid
-	size_in_bytes=`stat -c %s $2/$1.pdf`
+	#creates content files for pdf $1 in directory $2 with $3 pages
+	local page_uuid=$(new_uuid)
+	local size_in_bytes=`stat -c %s $2/$1.pdf`
 
 	cp -v $script_dir/doc_content.txt $2/$1.content
-	sed -i -e "s/PAGE_UUID/$page_uuid/" -e "s/SIZE_IN_BYTES/$size_in_bytes/" $2/$1.content
+	sed -i -e "s/PAGE_UUID/$page_uuid/" -e "s/SIZE_IN_BYTES/$size_in_bytes/" -e "s/PAGE_COUNT/$3/" $2/$1.content
 }
 
 function find_uuid() {
