@@ -1,7 +1,6 @@
 # vi: ft=sh
 
-#xochitl_loc="/home/root/.local/share/remarkable/xochitl"
-xochitl_loc="./xochitl"
+xochitl_loc="/home/root/.local/share/remarkable/xochitl"
 
 function create_dir_metadata() {
 	#creates metadata for new directory under $1 with name $2 and uuid $3 in directory $4
