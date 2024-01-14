@@ -1,36 +1,53 @@
 # vi: ft=sh
 
-xochitl_loc="/home/root/.local/share/remarkable/xochitl"
+#xochitl_loc="/home/root/.local/share/remarkable/xochitl"
+xochitl_loc="./xochitl"
 
 script_dir="$( cd -- "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 function create_dir_metadata() {
-	#creates metadata for new directory under $1 with name $2 and uuid $3 in directory $4
+	#creates metadata for new remarkable directory under parent $1 with name $2 and uuid $3 in linux directory $4 (xochitl_loc, generally)
+	local parent_uuid=$1
+	local dir_name=$2
+	local dir_uuid=$3
+	local location=$4
 
-	cp -v $script_dir/dir_metadata.txt $4/$3.metadata
-	sed -i -e "s|PARENT_UUID|\"$1\"|" -e "s|DIR_NAME|\"$2\"|" $4/$3.metadata
+
+	cp -v $script_dir/dir_metadata.txt $location/$dir_uuid.metadata
+	sed -i -e "s/PARENT_UUID/$parent_uuid/" -e "s/DIR_NAME/$dir_name/" $location/$dir_uuid.metadata
 }
 
 function create_dir_content() {
-	#creates content for new rm directory $1 in directory location $2
-	echo "{}" > $2/$1.content
+	#creates content for new remarkable directory $1 in linux location $2
+	local dir_uuid=$1
+	local location=$2
+	echo "{}" > $location/$dir_uuid.content
 }
 
 function create_doc_metadata() {
 	#creates metadata and pagedata files for pdf $1 under parent $2 with visible name $3 in directory $4
-	local mod_time=`date +%s`
+	local pdf_uuid=$1
+	local parent_uuid=$2
+	local doc_name=$3
+	local location=$4
+
+	local mod_time=$(date +%s)
 
 	cp -v $script_dir/doc_metadata.txt $4/$1.metadata
-	sed -i -e "s/PARENT_NAME/$2/" -e "s/DOC_NAME/$3/" -e "s/MOD_TIME/$mod_time/" $4/$1.metadata
+	sed -i -e "s/PARENT_NAME/$parent_uuid/" -e "s/DOC_NAME/$doc_name/" -e "s/MOD_TIME/$mod_time/" $location/$pdf_uuid.metadata
 }
 
 function create_doc_content() {
 	#creates content files for pdf $1 in directory $2 with $3 pages
-	local page_uuid=$(new_uuid)
-	local size_in_bytes=`stat -c %s $2/$1.pdf`
+	local pdf_uuid=$1
+	local page_count=$2
+	local location=$3
 
-	cp -v $script_dir/doc_content.txt $2/$1.content
-	sed -i -e "s/PAGE_UUID/$page_uuid/" -e "s/SIZE_IN_BYTES/$size_in_bytes/" -e "s/PAGE_COUNT/$3/" $2/$1.content
+	local page_uuid=$(new_uuid)
+	local size_in_bytes=$(stat -c %s $location/$pdf_uuid.pdf)
+
+	cp -v $script_dir/doc_content.txt $location/$pdf_uuid.content
+	sed -i -e "s/PAGE_UUID/$page_uuid/" -e "s/SIZE_IN_BYTES/$size_in_bytes/" -e "s/PAGE_COUNT/$page_count/" $location/$pdf_uuid.content
 }
 
 function find_uuid() {
@@ -67,7 +84,7 @@ function find_uuid() {
 
 function get_name() {
 	local __resultvar=$2
-	local doc_name=`sed -e 's/    //g' -e 's/\"//g' -e 's/: /:/g' $1 | awk -F '[:,]' '{if ($1 == "visibleName") print $2;}'`
+	local doc_name=$(sed -e 's/    //g' -e 's/\"//g' -e 's/: /:/g' $1 | awk -F '[:,]' '{if ($1 == "visibleName") print $2;}')
     if [[ "$__resultvar" ]]; then
         eval $__resultvar="'$doc_name'"
     else
@@ -77,7 +94,7 @@ function get_name() {
 
 function get_type() {
 	local __resultvar=$2
-	local doc_type=`sed -e 's/    //g' -e 's/\"//g' -e 's/: /:/g' $1 | awk -F '[:,]' '{if ($1 == "type") print $2;}'`
+	local doc_type=$(sed -e 's/    //g' -e 's/\"//g' -e 's/: /:/g' $1 | awk -F '[:,]' '{if ($1 == "type") print $2;}')
     if [[ "$__resultvar" ]]; then
         eval $__resultvar="'$doc_type'"
     else
@@ -87,7 +104,7 @@ function get_type() {
 
 function get_parent_uuid() {
 	local __resultvar=$2
-	local parent_uuid=`sed -e 's/    //g' -e 's/\"//g' -e 's/: /:/g' $1 | awk -F '[:,]' '{if ($1 == "parent") print $2;}'`
+	local parent_uuid=$(sed -e 's/    //g' -e 's/\"//g' -e 's/: /:/g' $1 | awk -F '[:,]' '{if ($1 == "parent") print $2;}')
 	if [[ "$__resultvar" ]]; then
 		eval $__resultvar="'$parent_uuid'"
 	else
@@ -103,7 +120,7 @@ function check_path() {
 	local leaf_name="$(basename $1)"
 	local parent_uuid=$2
 
-	local root_dir=`echo $1 | awk -F '/' '{print $2}'`
+	local root_dir=$(echo $1 | awk -F '/' '{print $2}')
 
 	if [[ -z $parent_uuid  && $leaf_name == "/" ]]; then # Special case is passed the root directory
 		local result=true
@@ -135,7 +152,7 @@ function check_path() {
 
 function new_uuid() {
 	local  __resultvar=$1
-    local  uuid=`cat /proc/sys/kernel/random/uuid`
+	local  uuid=$(cat /proc/sys/kernel/random/uuid)
     if [[ "$__resultvar" ]]; then
         eval $__resultvar="'$uuid'"
     else
@@ -143,26 +160,12 @@ function new_uuid() {
     fi
 }
 
-#function rm_mkdir() {
-#	local parent_uuid
-#	local dir_uuid
-#    IFS=$'\n'
-#	dir_arr=($(echo "$1" | sed -e 's|/|\n|g' | awk -F '\n' -v q='"' '{ print $1 }'))
-#	for ((i=0; i<${#dir_arr[@]}; i++)) ; do
-#		if [[ $i != 0 ]]; then
-#			parent=${dir_arr[$i-1]}
-#			find_uuid $parent "dir" parent_uuid
-#		fi
-#		find_uuid ${dir_arr[$i]} "dir" dir_uuid
-#		if [[ $dir_uuid == "" ]]; then
-#			new_uuid dir_uuid
-#			create_dir_metadata "$parent_uuid" "${dir_arr[$i]}" $dir_uuid $xochitl_loc
-#			create_dir_content $dir_uuid $xochitl_loc
-#		fi
-#	done
-#}
-
 function rm_mkdir() {
+	# makes directory $1 if it doesn't exist
+	# returns the uuid of the new directory, or the one already at that location if it exists
+
+	local  __resultvar=$2
+
 	local num_fields=$(echo $1 | awk -F '/' '{print NF}')
 	local print_string='{print '
 	for ((i=0; i<$num_fields-1; i++)) ; do
@@ -177,4 +180,10 @@ function rm_mkdir() {
 		fi
 		local parent_uuid=$dir_uuid
 	done
+
+	if [[ "$__resultvar" ]]; then
+		eval $__resultvar="'$dir_uuid'"
+	else
+		echo "$dir_uuid"
+	fi
 }
