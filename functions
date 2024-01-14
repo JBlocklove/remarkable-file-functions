@@ -1,7 +1,6 @@
 # vi: ft=sh
 
-#xochitl_loc="/home/root/.local/share/remarkable/xochitl"
-xochitl_loc="./xochitl"
+xochitl_loc="/home/root/.local/share/remarkable/xochitl"
 
 script_dir="$( cd -- "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
