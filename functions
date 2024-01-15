@@ -12,7 +12,7 @@ function create_dir_metadata() {
 	local location=$4
 
 
-	cp -v $script_dir/dir_metadata.txt $location/$dir_uuid.metadata
+	cp $script_dir/dir_metadata.txt $location/$dir_uuid.metadata
 	sed -i -e "s/PARENT_UUID/$parent_uuid/" -e "s/DIR_NAME/$dir_name/" $location/$dir_uuid.metadata
 }
 
@@ -29,23 +29,25 @@ function create_doc_metadata() {
 	local parent_uuid=$2
 	local doc_name=$3
 	local location=$4
+	local metadata_file=${5:-"$script_dir/doc_metadata.txt"}
 
 	local mod_time=$(date +%s)
 
-	cp -v $script_dir/doc_metadata.txt $4/$1.metadata
-	sed -i -e "s/PARENT_NAME/$parent_uuid/" -e "s/DOC_NAME/$doc_name/" -e "s/MOD_TIME/$mod_time/" $location/$pdf_uuid.metadata
+	cp $metadata_file $location/$pdf_uuid.metadata
+	sed -i -e "s/PARENT_UUID/$parent_uuid/" -e "s/DOC_NAME/$doc_name/" -e "s/MOD_TIME/$mod_time/" $location/$pdf_uuid.metadata
 }
 
 function create_doc_content() {
 	#creates content files for pdf $1 in directory $2 with $3 pages
 	local pdf_uuid=$1
-	local page_count=$2
+	local page_count=${2:-"1"}
 	local location=$3
+	local content_file=${4:-"$script_dir/doc_content.txt"}
 
 	local page_uuid=$(new_uuid)
 	local size_in_bytes=$(stat -c %s $location/$pdf_uuid.pdf)
 
-	cp -v $script_dir/doc_content.txt $location/$pdf_uuid.content
+	cp $content_file $location/$pdf_uuid.content
 	sed -i -e "s/PAGE_UUID/$page_uuid/" -e "s/SIZE_IN_BYTES/$size_in_bytes/" -e "s/PAGE_COUNT/$page_count/" $location/$pdf_uuid.content
 }
 

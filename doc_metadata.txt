@@ -5,7 +5,7 @@
     "lastOpenedPage": 0,
     "metadatamodified": false,
     "modified": false,
-    "parent": "PARENT_NAME",
+    "parent": "PARENT_UUID",
     "pinned": false,
     "synced": false,
     "type": "DocumentType",
