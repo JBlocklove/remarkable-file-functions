@@ -166,21 +166,24 @@ function rm_mkdir() {
 	# returns the uuid of the new directory, or the one already at that location if it exists
 
 	local  __resultvar=$2
-
-	local num_fields=$(echo $1 | awk -F '/' '{print NF}')
-	local print_string='{print '
-	for ((i=0; i<$num_fields-1; i++)) ; do
-		local print_val=$((i+2))
-		local print_string=${print_string}\"/\"\$${print_val}
-		local dir=$(echo $1 | awk -F '/' "$print_string}")
-		local dir_uuid=$(find_uuid "$dir" "CollectionType")
-		if [[ $dir_uuid == "" ]]; then
-			local dir_uuid=$(new_uuid)
-			create_dir_metadata "$parent_uuid" "$(basename "$dir")" $dir_uuid $xochitl_loc
-			create_dir_content $dir_uuid $xochitl_loc
-		fi
-		local parent_uuid=$dir_uuid
-	done
+	if [[ "$1" == "/" ]]; then #returns no parent UUID if destination is root
+		local dir_uuid=""
+    else
+        local num_fields=$(echo $1 | awk -F '/' '{print NF}')
+        local print_string='{print '
+        for ((i=0; i<$num_fields-1; i++)) ; do
+			local print_val=$((i+2))
+            local print_string=${print_string}\"/\"\$${print_val}
+            local dir=$(echo $1 | awk -F '/' "$print_string}")
+            local dir_uuid=$(find_uuid "$dir" "CollectionType")
+            if [[ $dir_uuid == "" ]]; then
+                local dir_uuid=$(new_uuid)
+                create_dir_metadata "$parent_uuid" "$(basename "$dir")" $dir_uuid $xochitl_loc
+                create_dir_content $dir_uuid $xochitl_loc
+            fi
+            local parent_uuid=$dir_uuid
+        done
+	fi
 
 	if [[ "$__resultvar" ]]; then
 		eval $__resultvar="'$dir_uuid'"
